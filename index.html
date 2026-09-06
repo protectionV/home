@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Animated Network Background</title>
+
+  <style>
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+    }
+
+    body {
+      background: #080a0f;
+      color: white;
+      font-family: Arial, sans-serif;
+      overflow-x: hidden;
+    }
+
+    #network-bg {
+      position: fixed;
+
+      inset: 0;
+
+      width: 100%;
+      height: 100%;
+
+      z-index: -1;
+
+      pointer-events: none;
+    }
+
+
+    .content {
+      position: relative;
+
+      min-height: 100vh;
+
+      display: flex;
+
+      align-items: center;
+      justify-content: center;
+
+      text-align: center;
+
+      padding: 40px;
+
+      box-sizing: border-box;
+    }
+
+    .content-inner {
+      max-width: 700px;
+    }
+
+    h1 {
+      font-size: clamp(40px, 7vw, 90px);
+      margin: 0 0 20px;
+      line-height: 1;
+    }
+
+    p {
+      font-size: 18px;
+      line-height: 1.6;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+
+
+<body>
+
+
+  <canvas id="network-bg"></canvas>
+
+
+  <main class="content">
+
+    <div class="content-inner">
+
+      <h1>
+        BeCyan.com
+      </h1>
+<hr>
+      <p>
+        The CodeSmith is cooking something new. Stay tuned and stay safe till then. 
+      </p>
+
+    </div>
+
+  </main>
+
+
+  <script>
+
+    const canvas =
+      document.getElementById("network-bg");
+
+    const ctx =
+      canvas.getContext("2d");
+
+
+    let width;
+    let height;
+    let dpr;
+
+    let points = [];
+
+
+    /* =====================================================
+       MOUSE
+       ===================================================== */
+
+    const mouse = {
+
+      x: -9999,
+
+      y: -9999,
+
+      active: false
+
+    };
+
+
+ 
+    const config = {
+      spacing: 50,
+     
+      dotRadius: 0.9,
+
+      connectionDistance: 100,
+
+      revealRadius: 280,
+
+      revealSoftness: 100,
+
+      speed: 0.08,
+
+      dotOpacity: 0.6,
+
+      maxLineOpacity: 0.25,
+
+      colors: [
+
+        [255, 90, 120],
+
+        [255, 170, 70],
+
+        [255, 230, 90],
+
+        [80, 220, 180],
+
+        [70, 180, 255],
+
+        [120, 120, 255],
+
+        [190, 100, 255],
+
+        [255, 100, 210]
+
+      ]
+
+    };
+
+
+    function randomColor() {
+
+      const color =
+        config.colors[
+          Math.floor(
+            Math.random() *
+            config.colors.length
+          )
+        ];
+
+   
+      return [...color];
+
+    }
+
+
+    function blendColors(
+      a,
+      b,
+      amount = 0.5
+    ) {
+
+      return [
+
+        Math.round(
+          a[0] +
+          (b[0] - a[0]) *
+          amount
+        ),
+
+        Math.round(
+          a[1] +
+          (b[1] - a[1]) *
+          amount
+        ),
+
+        Math.round(
+          a[2] +
+          (b[2] - a[2]) *
+          amount
+        )
+
+      ];
+
+    }
+
+
+ 
+    function colorString(
+      color,
+      opacity
+    ) {
+
+      return (
+        `rgba(` +
+        `${color[0]},` +
+        `${color[1]},` +
+        `${color[2]},` +
+        `${opacity})`
+      );
+
+    }
+
+
+    function distance(
+      ax,
+      ay,
+      bx,
+      by
+    ) {
+
+      const dx =
+        ax - bx;
+
+      const dy =
+        ay - by;
+
+      return Math.sqrt(
+        dx * dx +
+        dy * dy
+      );
+
+    }
+
+
+    window.addEventListener(
+      "mousemove",
+      function(event) {
+
+        mouse.x =
+          event.clientX;
+
+        mouse.y =
+          event.clientY;
+
+        mouse.active = true;
+
+      }
+    );
+
+
+    window.addEventListener(
+      "mouseleave",
+      function() {
+
+        mouse.active = false;
+
+      }
+    );
+
+
+
+    window.addEventListener(
+      "touchmove",
+      function(event) {
+
+        if (
+          !event.touches.length
+        ) {
+          return;
+        }
+
+
+        mouse.x =
+          event.touches[0].clientX;
+
+        mouse.y =
+          event.touches[0].clientY;
+
+        mouse.active = true;
+
+      },
+      {
+        passive: true
+      }
+    );
+
+
+
+    window.addEventListener(
+      "touchend",
+      function() {
+
+        mouse.active = false;
+
+      }
+    );
+
+
+
+    class Point {
+
+      constructor() {
+
+        this.reset();
+
+      }
+
+
+      reset() {
+
+        this.x =
+          Math.random() *
+          width;
+
+        this.y =
+          Math.random() *
+          height;
+
+
+
+
+        const angle =
+          Math.random() *
+          Math.PI *
+          2;
+
+
+        const pointSpeed =
+          config.speed *
+          (
+            0.4 +
+            Math.random() *
+            0.8
+          );
+
+
+        this.vx =
+          Math.cos(angle) *
+          pointSpeed;
+
+        this.vy =
+          Math.sin(angle) *
+          pointSpeed;
+
+
+        this.radius =
+          config.dotRadius *
+          (
+            0.9 +
+            Math.random() *
+            0.6
+          );
+
+        this.color =
+          randomColor();
+
+      }
+
+
+      update() {
+
+        this.x += this.vx;
+
+        this.y += this.vy;
+
+        if (
+          this.x < -10
+        ) {
+
+          this.x =
+            width + 10;
+
+        }
+
+
+        if (
+          this.x >
+          width + 10
+        ) {
+
+          this.x = -10;
+
+        }
+
+
+        if (
+          this.y < -10
+        ) {
+
+          this.y =
+            height + 10;
+
+        }
+
+
+        if (
+          this.y >
+          height + 10
+        ) {
+
+          this.y = -10;
+
+        }
+
+      }
+
+
+
+      draw() {
+
+        const mouseDistance =
+          distance(
+            this.x,
+            this.y,
+            mouse.x,
+            mouse.y
+          );
+
+
+
+
+        if (
+
+          mouse.active &&
+
+          mouseDistance >
+          config.revealRadius +
+          config.revealSoftness
+
+        ) {
+
+          return;
+
+        }
+
+
+        let opacity =
+          config.dotOpacity;
+
+
+        if (
+          mouse.active
+        ) {
+
+          const fadeStart =
+            config.revealRadius;
+
+          const fadeEnd =
+            config.revealRadius +
+            config.revealSoftness;
+
+
+          if (
+            mouseDistance >
+            fadeStart
+          ) {
+
+            opacity =
+              1 -
+              (
+                mouseDistance -
+                fadeStart
+              ) /
+              (
+                fadeEnd -
+                fadeStart
+              );
+
+
+            opacity *=
+              config.dotOpacity;
+
+          }
+
+        }
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+
+          this.x,
+
+          this.y,
+
+          this.radius,
+
+          0,
+
+          Math.PI * 2
+
+        );
+
+
+        ctx.fillStyle =
+          colorString(
+            this.color,
+            opacity
+          );
+
+
+        ctx.fill();
+
+      }
+
+    }
+
+
+
+    function resize() {
+
+      width =
+        window.innerWidth;
+
+      height =
+        window.innerHeight;
+
+
+      dpr =
+        Math.min(
+          window.devicePixelRatio || 1,
+          2
+        );
+
+
+      canvas.width =
+        width * dpr;
+
+      canvas.height =
+        height * dpr;
+
+
+      canvas.style.width =
+        width + "px";
+
+      canvas.style.height =
+        height + "px";
+
+
+      ctx.setTransform(
+
+        dpr,
+        0,
+        0,
+        dpr,
+        0,
+        0
+
+      );
+
+
+      createPoints();
+
+    }
+
+    function createPoints() {
+
+      const area =
+        width * height;
+
+
+      const count =
+        Math.max(
+
+          20,
+
+          Math.floor(
+
+            area /
+            (
+              config.spacing *
+              config.spacing
+            )
+
+          )
+
+        );
+
+
+      points =
+        Array.from(
+
+          {
+            length: count
+          },
+
+          () => new Point()
+
+        );
+
+    }
+
+    function drawConnections() {
+
+
+      for (
+        let i = 0;
+        i < points.length;
+        i++
+      ) {
+
+
+        for (
+          let j = i + 1;
+          j < points.length;
+          j++
+        ) {
+
+
+          const a =
+            points[i];
+
+          const b =
+            points[j];
+
+
+          const dx =
+            a.x - b.x;
+
+          const dy =
+            a.y - b.y;
+
+
+          const distanceSquared =
+            dx * dx +
+            dy * dy;
+
+
+          const maxDistance =
+            config.connectionDistance;
+
+
+          const maxDistanceSquared =
+            maxDistance *
+            maxDistance;
+
+
+
+          if (
+            distanceSquared >
+            maxDistanceSquared
+          ) {
+
+            continue;
+
+          }
+
+
+          const lineDistance =
+            Math.sqrt(
+              distanceSquared
+            );
+
+
+          let mouseOpacity = 1;
+
+
+          if (
+            mouse.active
+          ) {
+
+
+                    
+            const midpointX =
+              (
+                a.x +
+                b.x
+              ) / 2;
+
+
+            const midpointY =
+              (
+                a.y +
+                b.y
+              ) / 2;
+
+
+            const mouseDistance =
+              distance(
+
+                midpointX,
+
+                midpointY,
+
+                mouse.x,
+
+                mouse.y
+
+              );
+
+
+            if (
+
+              mouseDistance >
+              config.revealRadius +
+              config.revealSoftness
+
+            ) {
+
+              continue;
+
+            }
+
+
+
+            if (
+
+              mouseDistance >
+              config.revealRadius
+
+            ) {
+
+              mouseOpacity =
+                1 -
+                (
+                  mouseDistance -
+                  config.revealRadius
+                ) /
+                config.revealSoftness;
+
+            }
+
+          }
+
+
+          const distanceOpacity =
+            1 -
+            (
+              lineDistance /
+              maxDistance
+            );
+
+
+          const opacity =
+            distanceOpacity *
+            config.maxLineOpacity *
+            mouseOpacity;
+
+
+
+          const blended =
+            blendColors(
+              a.color,
+              b.color,
+              0.5
+            );
+
+
+
+          const gradient =
+            ctx.createLinearGradient(
+
+              a.x,
+              a.y,
+
+              b.x,
+              b.y
+
+            );
+
+
+          gradient.addColorStop(
+
+            0,
+
+            colorString(
+              a.color,
+              opacity
+            )
+
+          );
+
+
+          gradient.addColorStop(
+
+            0.5,
+
+            colorString(
+              blended,
+              opacity
+            )
+
+          );
+
+          gradient.addColorStop(
+
+            1,
+
+            colorString(
+              b.color,
+              opacity
+            )
+
+          );
+
+
+          ctx.beginPath();
+
+          ctx.moveTo(
+            a.x,
+            a.y
+          );
+
+          ctx.lineTo(
+            b.x,
+            b.y
+          );
+
+
+          ctx.strokeStyle =
+            gradient;
+
+
+          ctx.lineWidth = 1;
+
+
+          ctx.stroke();
+
+        }
+
+      }
+
+    }
+
+
+    function animate() {
+
+
+
+      ctx.clearRect(
+
+        0,
+        0,
+        width,
+        height
+
+      );
+
+
+
+      points.forEach(
+        point => point.update()
+      );
+
+
+
+      drawConnections();
+
+
+      points.forEach(
+        point => point.draw()
+      );
+
+
+      requestAnimationFrame(
+        animate
+      );
+
+    }
+
+
+    window.addEventListener(
+      "resize",
+      resize
+    );
+
+
+    resize();
+
+    animate();
+
+  </script>
+
+</body>
+
+</html>
+
